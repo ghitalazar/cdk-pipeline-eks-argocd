@@ -1,20 +1,42 @@
 #!/usr/bin/env node
 import * as cdk from 'aws-cdk-lib';
-import { CdkPipelineEksArgocdStack } from '../lib/cdk-pipeline-eks-argocd-stack';
+import * as blueprints from '@aws-quickstart/eks-blueprints';
+import { KubernetesVersion } from 'aws-cdk-lib/aws-eks';
 
 const app = new cdk.App();
-new CdkPipelineEksArgocdStack(app, 'CdkPipelineEksArgocdStack', {
-  /* If you don't specify 'env', this stack will be environment-agnostic.
-   * Account/Region-dependent features and context lookups will not work,
-   * but a single synthesized template can be deployed anywhere. */
+const account = process.env.CDK_DEFAULT_ACCOUNT!;
+const region = process.env.CDK_DEFAULT_REGION!;
 
-  /* Uncomment the next line to specialize this stack for the AWS Account
-   * and Region that are implied by the current CLI configuration. */
-  // env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.CDK_DEFAULT_REGION },
+const repoUrl = 'https://github.com/aws-samples/eks-blueprints-workloads.git';
+const flaskAppPath = 'envs/dev';
 
-  /* Uncomment the next line if you know exactly what Account and Region you
-   * want to deploy the stack to. */
-  // env: { account: '123456789012', region: 'us-east-1' },
+const blueprint = blueprints.EksBlueprint.builder()
+  .account(account)
+  .region(region)
+  .version(KubernetesVersion.V1_29)
+  .addOns(
+    new blueprints.addons.ArgoCDAddOn({
+      bootstrapRepo: {
+        repoUrl,
+        targetRevision: 'main',
+        path: flaskAppPath
+      }
+    }),
+    new blueprints.addons.MetricsServerAddOn(),
+    new blueprints.addons.ClusterAutoScalerAddOn(),
+    new blueprints.addons.AwsLoadBalancerControllerAddOn()
+  );
 
-  /* For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html */
-});
+blueprints.CodePipelineStack.builder()
+  .name('MyEksPipeline')
+  .repository({
+    repoUrl: 'ghitalazar/cdk-pipeline-eks-argocd', // ✅ FIXED
+    credentialsSecretName: 'cdk-pipeline-github-token',
+    targetRevision: 'main'
+  })
+  .owner('ghitalazar')
+  .wave({
+    id: 'eks-deploy',
+    stages: [{ id: 'dev', stackBuilder: blueprint }]
+  })
+  .build(app, 'PipelineStack', { env: { account, region } });
