@@ -30,7 +30,7 @@ const blueprint = blueprints.EksBlueprint.builder()
 blueprints.CodePipelineStack.builder()
   .name('MyEksPipeline')
   .repository({
-    repoUrl: 'ghitalazar/cdk-pipeline-eks-argocd', // ✅ FIXED
+    repoUrl: 'cdk-pipeline-eks-argocd', // ✅ FIXED
     credentialsSecretName: 'cdk-pipeline-github-token',
     targetRevision: 'main'
   })
